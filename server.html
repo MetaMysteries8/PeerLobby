@@ -6,11 +6,16 @@
     <title>Server - God Simulator Lobby</title>
     <style>
         body { font-family: Arial, sans-serif; }
-        #clients { border: 1px solid #ccc; padding: 10px; width: 300px; height: 400px; overflow-y: scroll; }
+        #map { border: 1px solid #ccc; width: 800px; height: 600px; position: relative; }
+        .client { position: absolute; width: 30px; height: 30px; text-align: center; cursor: pointer; }
+        .wall { position: absolute; background-color: black; }
+        #clients { border: 1px solid #ccc; padding: 10px; width: 200px; height: 600px; overflow-y: scroll; float: left; }
         #chat { border: 1px solid #ccc; padding: 10px; width: 300px; height: 400px; overflow-y: scroll; }
         #message { width: 200px; }
         .container { display: flex; }
         .box { margin-right: 20px; }
+        #controls { margin-top: 10px; }
+        #controls button { margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -21,8 +26,12 @@
     </div>
     <div class="container">
         <div id="clients" class="box"></div>
-        <div id="chat" class="box"></div>
+        <div id="map" class="box"></div>
     </div>
+    <div id="controls">
+        <button id="create-wall">Create Wall</button>
+    </div>
+    <div id="chat"></div>
     <div>
         <input type="text" id="message" placeholder="Type a message">
         <button id="send-button">Send</button>
@@ -32,27 +41,30 @@
         const peer = new Peer();
         const serverIdInput = document.getElementById('server-id');
         const clientsBox = document.getElementById('clients');
+        const map = document.getElementById('map');
         const chatBox = document.getElementById('chat');
         const messageInput = document.getElementById('message');
         const sendButton = document.getElementById('send-button');
+        const createWallButton = document.getElementById('create-wall');
 
         let clients = [];
 
-        // Display server ID
         peer.on('open', id => {
             serverIdInput.value = id;
         });
 
-        // Handle incoming connections from clients
         peer.on('connection', connection => {
             clients.push(connection);
-            clientsBox.innerHTML += `<p id="${connection.peer}">${connection.peer} 
-                <button onclick="kick('${connection.peer}')">Kick</button> 
-                <button onclick="move('${connection.peer}', 'top')">Move Up</button> 
-                <button onclick="move('${connection.peer}', 'bottom')">Move Down</button></p>`;
-
             connection.on('data', data => {
-                chatBox.innerHTML += `<p>Client ${connection.peer}: ${data}</p>`;
+                if (data.type === 'move') {
+                    const clientElem = document.getElementById(data.id);
+                    if (clientElem) {
+                        clientElem.style.left = data.x + 'px';
+                        clientElem.style.top = data.y + 'px';
+                    }
+                } else if (data.type === 'message') {
+                    chatBox.innerHTML += `<p>${data.username}: ${data.content}</p>`;
+                }
             });
 
             connection.on('close', () => {
@@ -61,7 +73,6 @@
             });
         });
 
-        // Send a message to all clients
         sendButton.addEventListener('click', () => {
             const message = messageInput.value;
             chatBox.innerHTML += `<p>Server: ${message}</p>`;
@@ -69,7 +80,16 @@
             messageInput.value = '';
         });
 
-        // Kick a client
+        createWallButton.addEventListener('click', () => {
+            const wall = document.createElement('div');
+            wall.className = 'wall';
+            wall.style.width = '100px';
+            wall.style.height = '20px';
+            wall.style.left = '350px';
+            wall.style.top = '290px';
+            map.appendChild(wall);
+        });
+
         function kick(clientId) {
             const client = clients.find(conn => conn.peer === clientId);
             if (client) {
@@ -81,7 +101,6 @@
             }
         }
 
-        // Move a client
         function move(clientId, direction) {
             const client = clients.find(conn => conn.peer === clientId);
             if (client) {
