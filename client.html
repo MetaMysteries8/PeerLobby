@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client - God Simulator Lobby</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #map { border: 1px solid #ccc; width: 800px; height: 600px; position: relative; }
+        .client { position: absolute; width: 30px; height: 30px; text-align: center; cursor: pointer; }
+        .wall { position: absolute; background-color: black; }
+        #chat { border: 1px solid #ccc; padding: 10px; width: 300px; height: 400px; overflow-y: scroll; }
+        #message { width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Client - God Simulator Lobby</h1>
+    <div>
+        <label for="server-id">Server ID:</label>
+        <input type="text" id="server-id">
+        <button id="connect-button">Connect</button>
+    </div>
+    <div id="map"></div>
+    <div id="chat"></div>
+    <div>
+        <input type="text" id="message" placeholder="Type a message">
+        <button id="send-button">Send</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.3.2/dist/peerjs.min.js"></script>
+    <script>
+        const peer = new Peer();
+        const serverIdInput = document.getElementById('server-id');
+        const map = document.getElementById('map');
+        const chatBox = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const sendButton = document.getElementById('send-button');
+        const connectButton = document.getElementById('connect-button');
+        let connection;
+
+        peer.on('open', id => {
+            const clientElem = document.createElement('div');
+            clientElem.id = id;
+            clientElem.className = 'client';
+            clientElem.style.backgroundColor = getRandomColor();
+            clientElem.style.left = '50px';
+            clientElem.style.top = '50px';
+            clientElem.innerText = 'You';
+            map.appendChild(clientElem);
+
+            clientElem.addEventListener('mousedown', onMouseDown);
+
+            function onMouseDown(e) {
+                const clientRect = map.getBoundingClientRect();
+                const clientX = e.clientX - clientRect.left - 15;
+                const clientY = e.clientY - clientRect.top - 15;
+
+                clientElem.style.left = clientX + 'px';
+                clientElem.style.top = clientY + 'px';
+
+                const onMouseMove = (moveEvent) => {
+                    const newClientX = moveEvent.clientX - clientRect.left - 15;
+                    const newClientY = moveEvent.clientY - clientRect.top - 15;
+                    clientElem.style.left = newClientX + 'px';
+                    clientElem.style.top = newClientY + 'px';
+                };
+
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    connection.send({ type: 'move', id, x: clientX, y: clientY });
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+
+            connectButton.addEventListener('click', () => {
+                const serverId = serverIdInput.value;
+                connection = peer.connect(serverId);
+
+                connection.on('open', () => {
+                    chatBox.innerHTML += `<p>Connected to server</p>`;
+                });
+
+                connection.on('data', data => {
+                    if (data.type === 'move') {
+                        const clientElem = document.getElementById(data.id);
+                        if (clientElem) {
+                            clientElem.style.left = data.x + 'px';
+                            clientElem.style.top = data.y + 'px';
+                        }
+                    } else if (data.type === 'message') {
+                        chatBox.innerHTML += `<p>${data.content}</p>`;
+                    } else if (data.type === 'kick') {
+                        chatBox.innerHTML += `<p>You have been kicked by the server</p>`;
+                        connection.close();
+                    }
+                });
+
+                connection.on('close', () => {
+                    chatBox.innerHTML += `<p>Disconnected from server</p>`;
+                });
+            });
+
+            sendButton.addEventListener('click', () => {
+                const message = messageInput.value;
+                chatBox.innerHTML += `<p>You: ${message}</p>`;
+                connection.send({ type: 'message', content: message });
+                messageInput.value = '';
+            });
+        });
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+    </script>
+</body>
+</html>
